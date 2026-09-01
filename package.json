@@ -1,0 +1,9 @@
+{
+  "name": "messaging-app",
+  "private": true,
+  "workspaces": [
+    "shared",
+    "server",
+    "client"
+  ]
+}
