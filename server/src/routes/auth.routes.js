@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { register } from "../controllers/auth.controller.js";
+import { login, register } from "../controllers/auth.controller.js";
 import { validate } from "../middlewares/validate.js";
-import { RegisterUserSchema } from "@messaging/shared";
+import { LoginUserSchema, RegisterUserSchema } from "@messaging/shared";
 import { authRateLimiter } from "../middlewares/rateLimiter.js";
 
 const router = Router();
@@ -12,5 +12,7 @@ router.post(
   validate(RegisterUserSchema),
   register,
 );
+
+router.post("/login", authRateLimiter, validate(LoginUserSchema), login);
 
 export default router;
