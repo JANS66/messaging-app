@@ -1,6 +1,6 @@
 import request from "supertest";
 import { app } from "../src/app.js";
-import { prisma } from "../src/prismaClient.js";
+import { prisma } from "../src/config/db.js";
 import { clearDatabase, createTestUsers } from "./helpers.js";
 
 describe("3. Messages and Attachments", () => {

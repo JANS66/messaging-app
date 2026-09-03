@@ -1,8 +1,13 @@
 import request from "supertest";
 import { app } from "../src/app.js";
-import { prisma } from "../src/prismaClient.js";
+import { prisma } from "../src/config/db.js";
 
 export async function clearDatabase() {
+  // Safety guard against wiping production/Neon
+  if (process.env.DATABASE_URL.includes("neon.tech")) {
+    throw new Error("Test runned is connected to Neon DB");
+  }
+
   await prisma.$executeRawUnsafe(
     `TRUNCATE TABLE "User", "Conversation", "ConversationMember", "Message", "Attachment", "MessageStatus", "MessageReaction", "Block" CASCADE;`,
   );

@@ -1,6 +1,6 @@
 import request from "supertest";
-import { app } from "../src/app.js";
-import { prisma } from "../src/prismaClient.js";
+import app from "../src/app.js";
+import { prisma } from "../src/config/db.js";
 import { clearDatabase } from "./helpers.js";
 
 describe("1. Auth and User Management", () => {
@@ -44,7 +44,7 @@ describe("1. Auth and User Management", () => {
       email: "charlie@example.com",
       password: "Password123!",
     });
-    expect(userC.status.toBe(201));
+    expect(userC.status).toBe(201);
   });
 
   it("POST /auth/login -> should authenticate and return JWT token", async () => {
