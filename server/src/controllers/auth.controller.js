@@ -1,6 +1,6 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../config/db.js";
-import { generateToken, setAuthCookie } from "../utils/jwt.js";
+import { generateToken, setAuthCookie, clearAuthCookie } from "../utils/jwt.js";
 import { Prisma } from "@prisma/client";
 
 // Pre computed dummy hash used to mitigate timing attacks when a user is not found
@@ -106,4 +106,14 @@ export const login = async (req, res, next) => {
   } catch (error) {
     next(error);
   }
+};
+
+export const logout = (req, res) => {
+  // Clear the HTTP only cookie
+  clearAuthCookie(res);
+
+  return res.status(200).json({
+    status: "success",
+    message: "Logged out successfully",
+  });
 };
