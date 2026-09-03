@@ -2,7 +2,7 @@ import { z } from "zod";
 import {
   MessageTypeEnum,
   ReceiptStatusEnum,
-  UuidParamsSchema,
+  UuidParamSchema,
 } from "./common.js";
 
 export const AttachmentInputSchema = z.object({
@@ -13,7 +13,7 @@ export const AttachmentInputSchema = z.object({
 
 export const SendMessageSchema = z
   .object({
-    params: UuidParamsSchema,
+    params: UuidParamSchema,
     body: z.object({
       content: z
         .string()

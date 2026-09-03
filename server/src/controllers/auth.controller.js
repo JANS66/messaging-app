@@ -1,6 +1,7 @@
 import bcrypt from "bcryptjs";
 import { prisma } from "../config/db.js";
 import { generateToken, setAuthCookie } from "../utils/jwt.js";
+import { Prisma } from "@prisma/client";
 
 export const register = async (req, res, next) => {
   const { username, email, password } = req.body;
