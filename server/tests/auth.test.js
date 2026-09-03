@@ -65,7 +65,7 @@ describe("1. Auth and User Management", () => {
     const res = await agent.get("/api/v1/users/me");
 
     expect(res.status).toBe(200);
-    expect(res.body.username).toBe("user_alpha");
+    expect(res.body.data.user.username).toBe("user_alpha");
   });
 
   it("PATCH /users/me/presence -> should update online status", async () => {
