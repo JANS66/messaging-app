@@ -1,6 +1,11 @@
 {
   "name": "messaging-app",
   "private": true,
+  "scripts": {
+    "dev": "prisma generate && node --env-file=.env --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "prisma generate && vitest run"
+  },
   "workspaces": [
     "shared",
     "server",

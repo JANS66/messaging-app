@@ -33,7 +33,6 @@ export const UpdateProfileSchema = z.object({
       .max(30)
       .regex(/^[a-zA-Z0-9_]+$/)
       .optional(),
-    avatarUrl: z.string().url("Must be a valid URL").nullable().optional(),
     status: z.string().max(100, "Status text too long").nullable().optional(),
   }),
 });

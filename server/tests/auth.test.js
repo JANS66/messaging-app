@@ -2,6 +2,21 @@ import request from "supertest";
 import app from "../src/app.js";
 import { prisma } from "../src/config/db.js";
 import { clearDatabase } from "./helpers.js";
+import { vi } from "vitest";
+
+// Mock Cloudinary utility
+vi.mock("../src/utils/cloudinary.js", () => ({
+  uploadToCloudinary: vi.fn().mockResolvedValue({
+    url: "https://res.cloudinary.com/demo/image/upload/sample.jpg",
+    publicId: "messaging-app/avatars/sample",
+  }),
+  deleteFromCloudinary: vi.fn().mockResolvedValue(true),
+}));
+
+const validPngBuffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 describe("1. Auth and User Management", () => {
   // Agent automatically persists and sends cookies across requests
@@ -76,6 +91,46 @@ describe("1. Auth and User Management", () => {
     expect(res.status).toBe(200);
     expect(res.body.isOnline).toBe(true);
     expect(res.body.status).toBe("Coding tests...");
+  });
+
+  it("PATCH /users/me -> should fail with 400 if no fields or file are provided", async () => {
+    const res = await agent.patch("/api/v1/users/me").send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toBe(
+      "Please provide at least one field to update",
+    );
+  });
+
+  it("PATCH /users/me -> should successfully update username and status", async () => {
+    const res = await agent.patch("/api/v1/users/me").send({
+      username: "user_alpha_updated",
+      status: "Building awesome features!",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.username).toBe("user_alpha_updated");
+    expect(res.body.data.user.status).toBe("Building awesome features!");
+  });
+
+  it("PATCH /users/me -> should fail with 409 if username is taken", async () => {
+    // Attempting to change username to "user_beta" which belongs to User B
+    const res = await agent.patch("/api/v1/users/me").send({
+      username: "user_beta",
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.body.message).toBe("Username is already taken");
+  });
+
+  it("PATCH /users/me -> should upload avatar and update profile", async () => {
+    const res = await agent
+      .patch("/api/v1/users/me")
+      .field("username", "user_alpha_pic")
+      .attach("avatar", validPngBuffer, "avatar.png");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.user.avatarUrl).toBeDefined();
   });
 
   it("GET /users/search?q=beta -> should find User B", async () => {
