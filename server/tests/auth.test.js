@@ -1,8 +1,13 @@
 import request from "supertest";
+import { createServer } from "http";
+import { Server } from "socket.io";
 import app from "../src/app.js";
 import { prisma } from "../src/config/db.js";
 import { clearDatabase } from "./helpers.js";
 import { vi } from "vitest";
+import { io as ioClient } from "socket.io-client";
+import { setupPresenceHandlers } from "../src/sockets/presence.js";
+import { socketAuthMiddleware } from "../src/sockets/socket.auth.js";
 
 // Mock Cloudinary utility
 vi.mock("../src/utils/cloudinary.js", () => ({
@@ -19,14 +24,29 @@ const validPngBuffer = Buffer.from(
 );
 
 describe("1. Auth and User Management", () => {
-  // Agent automatically persists and sends cookies across requests
   const agent = request.agent(app);
+  let httpServer;
+  let io;
+  const PORT = 3000;
 
   beforeAll(async () => {
     await clearDatabase();
+
+    httpServer = createServer(app);
+    io = new Server(httpServer, {
+      cors: { origin: "*", credentials: true },
+    });
+
+    io.use(socketAuthMiddleware);
+    setupPresenceHandlers(io);
+
+    await new Promise((resolve) => httpServer.listen(PORT, resolve));
   });
 
   afterAll(async () => {
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
     await prisma.$disconnect();
   });
 
@@ -83,14 +103,39 @@ describe("1. Auth and User Management", () => {
     expect(res.body.data.user.username).toBe("user_alpha");
   });
 
-  it("PATCH /users/me/presence -> should update online status", async () => {
-    const res = await agent
-      .patch("/api/v1/users/me/presence")
-      .send({ isOnline: true, status: "Coding tests..." });
+  it("Socket.io -> should update online status on connect and emit presence change", async () => {
+    const loginRes = await agent.post("/api/v1/auth/login").send({
+      email: "alpha@example.com",
+      password: "Password123!",
+    });
 
-    expect(res.status).toBe(200);
-    expect(res.body.isOnline).toBe(true);
-    expect(res.body.status).toBe("Coding tests...");
+    expect(loginRes.status).toBe(200);
+
+    // Extract cookie directly from the response headers
+    const cookies = loginRes.headers["set-cookie"];
+    expect(cookies).toBeDefined();
+
+    const cookieHeader = cookies.find((c) => c.startsWith("token="));
+    expect(cookieHeader).toBeDefined();
+
+    const clientSocket = ioClient("http://localhost:3000", {
+      extraHeaders: {
+        cookie: cookieHeader,
+      },
+      transports: ["polling", "websocket"],
+    });
+
+    await new Promise((resolve, reject) => {
+      clientSocket.on("connect", resolve);
+      clientSocket.on("connect_error", reject);
+    });
+
+    const dbUser = await prisma.user.findUnique({
+      where: { username: "user_alpha" },
+    });
+    expect(dbUser.isOnline).toBe(true);
+
+    clientSocket.disconnect();
   });
 
   it("PATCH /users/me -> should fail with 400 if no fields or file are provided", async () => {

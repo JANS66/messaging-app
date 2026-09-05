@@ -37,13 +37,6 @@ export const UpdateProfileSchema = z.object({
   }),
 });
 
-export const UpdatePresenceSchema = z.object({
-  body: z.object({
-    isOnline: z.boolean(),
-    status: z.string().max(100).nullable().optional(),
-  }),
-});
-
 export const SearchUsersQuerySchema = z.object({
   query: z.object({
     q: z.string().min(1, "Search query cannot be empty").max(100),
