@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import authRoutes from "./routes/auth.routes.js";
 import userRoutes from "./routes/user.routes.js";
 import multer from "multer";
+import conversationRoutes from "./routes/conversation.routes.js";
 
 const app = express();
 
@@ -28,6 +29,7 @@ app.use(express.json({ limit: "10kb" })); // Defends against payload flooding
 // Mount API Routes
 app.use("/api/v1/auth", authRoutes);
 app.use("/api/v1/users", userRoutes);
+app.use("/api/v1/conversations", conversationRoutes);
 
 // Handle Unhandled Routes (404)
 app.use((req, res, next) => {

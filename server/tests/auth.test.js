@@ -24,10 +24,10 @@ const validPngBuffer = Buffer.from(
 );
 
 describe("1. Auth and User Management", () => {
-  const agent = request.agent(app);
+  let agent;
   let httpServer;
   let io;
-  const PORT = 3000;
+  let PORT;
 
   beforeAll(async () => {
     await clearDatabase();
@@ -40,7 +40,10 @@ describe("1. Auth and User Management", () => {
     io.use(socketAuthMiddleware);
     setupPresenceHandlers(io);
 
-    await new Promise((resolve) => httpServer.listen(PORT, resolve));
+    await new Promise((resolve) => httpServer.listen(0, resolve));
+    PORT = httpServer.address().port;
+
+    agent = request.agent(httpServer);
   });
 
   afterAll(async () => {
@@ -118,7 +121,7 @@ describe("1. Auth and User Management", () => {
     const cookieHeader = cookies.find((c) => c.startsWith("token="));
     expect(cookieHeader).toBeDefined();
 
-    const clientSocket = ioClient("http://localhost:3000", {
+    const clientSocket = ioClient(`http://localhost:${PORT}`, {
       extraHeaders: {
         cookie: cookieHeader,
       },
