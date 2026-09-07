@@ -182,8 +182,8 @@ describe("1. Auth and User Management", () => {
     const res = await agent.get("/api/v1/users/search?q=beta");
 
     expect(res.status).toBe(200);
-    expect(res.body.length).toBeGreaterThan(0);
-    expect(res.body[0].username).toBe("user_beta");
+    expect(res.body.data.users.length).toBeGreaterThan(0);
+    expect(res.body.data.users[0].username).toBe("user_beta");
   });
 
   it("POST /auth/logout -> should clear auth cookie and return 200", async () => {

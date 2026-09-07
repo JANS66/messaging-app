@@ -130,3 +130,53 @@ export const updateProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+export const searchUsers = async (req, res, next) => {
+  const { q } = req.query;
+
+  try {
+    const users = await prisma.user.findMany({
+      where: {
+        // Exclude current authenticated user
+        id: {
+          not: req.user.id,
+        },
+        // Match username OR email case insensitively
+        OR: [
+          {
+            username: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+          {
+            email: {
+              contains: q,
+              mode: "insensitive",
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        avatarUrl: true,
+        status: true,
+        isOnline: true,
+        lastSeen: true,
+      },
+      take: 20, // Limit results to prevent memory bloat on broad queries
+    });
+
+    return res.status(200).json({
+      status: "success",
+      results: users.length,
+      data: {
+        users,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

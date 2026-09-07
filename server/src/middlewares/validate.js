@@ -8,10 +8,19 @@ export const validate = (schema) => async (req, res, next) => {
       params: req.params,
     });
 
-    // Replace request data with parsed/sanitized output
-    if (parsed.body) req.body = parsed.body;
-    if (parsed.query) req.query = parsed.query;
-    if (parsed.params) req.params = parsed.params;
+    // Mutate properties in place instead of reassigning the read only objects
+    if (parsed.body) {
+      for (const key of Object.keys(req.body)) delete req.body[key];
+      Object.assign(req.body, parsed.body);
+    }
+    if (parsed.query) {
+      for (const key of Object.keys(req.query)) delete req.query[key];
+      Object.assign(req.query, parsed.query);
+    }
+    if (parsed.params) {
+      for (const key of Object.keys(req.params)) delete req.params[key];
+      Object.assign(req.params, parsed.params);
+    }
 
     next();
   } catch (error) {

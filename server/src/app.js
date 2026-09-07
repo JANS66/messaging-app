@@ -59,7 +59,10 @@ app.use((err, req, res, next) => {
   }
 
   // 2. Handle non Multer operational and system errors
-  if (process.env.NODE_ENV === "development") {
+  if (
+    process.env.NODE_ENV === "development" ||
+    process.env.NODE_ENV === "test"
+  ) {
     console.error("Unhandled Error Log:", err);
   }
 
