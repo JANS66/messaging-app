@@ -1,21 +1,31 @@
-import request from "supertest";
-import app from "../src/app.js";
 import { prisma } from "../src/config/db.js";
-import { clearDatabase, createTestUsers } from "./helpers.js";
+import { clearDatabase, createTestUsers, setupTestServer } from "./helpers.js";
+import { io as ioClient } from "socket.io-client";
 
 describe("2. Conversations and Members", () => {
   let userA, userB, userC;
   let groupConvId;
+  let httpServer, PORT;
 
   beforeAll(async () => {
     await clearDatabase();
-    const users = await createTestUsers();
+
+    const serverSetup = setupTestServer();
+    httpServer = serverSetup.httpServer;
+
+    await new Promise((resolve) => httpServer.listen(0, resolve));
+    PORT = httpServer.address().port;
+
+    const users = await createTestUsers(httpServer);
     userA = users.userA;
     userB = users.userB;
     userC = users.userC;
   });
 
   afterAll(async () => {
+    if (httpServer) {
+      await new Promise((resolve) => httpServer.close(resolve));
+    }
     await prisma.$disconnect();
   });
 
@@ -35,7 +45,7 @@ describe("2. Conversations and Members", () => {
     });
 
     expect(res.status).toBe(201);
-    expect(res.body.type).toBe("DIRECT");
+    expect(res.body.data.conversation.type).toBe("DIRECT");
   });
 
   it("POST /conversations -> should create a GROUP conversation with A as ADMIN", async () => {
@@ -46,7 +56,7 @@ describe("2. Conversations and Members", () => {
     });
 
     expect(res.status).toBe(201);
-    groupConvId = res.body.id;
+    groupConvId = res.body.data.conversation.id;
 
     const member = await prisma.conversationMember.findUnique({
       where: {
@@ -57,6 +67,46 @@ describe("2. Conversations and Members", () => {
       },
     });
     expect(member.role).toBe("ADMIN");
+  });
+
+  it("Socket.io -> should emit conversation_created event to other members", async () => {
+    // Connect a client socker for User B using their login session cookie
+    const loginRes = await userB.agent.post("/api/v1/auth/login").send({
+      email: "beta@example.com",
+      password: "Password123!",
+    });
+
+    const cookieHeader = loginRes.headers["set-cookie"].find((c) =>
+      c.startsWith("token="),
+    );
+
+    const clientSocket = ioClient(`http://localhost:${PORT}`, {
+      extraHeaders: { cookie: cookieHeader },
+    });
+
+    await new Promise((resolve, reject) => {
+      clientSocket.on("connect", resolve);
+      clientSocket.on("connect_error", reject);
+    });
+
+    const eventPromise = new Promise((resolve) => {
+      clientSocket.on("conversation_created", (data) => {
+        resolve(data);
+      });
+    });
+
+    // Create a group chat from User A involving User B
+    await userA.agent.post("/api/v1/conversations").send({
+      type: "GROUP",
+      name: "Socket Test Group",
+      memberIds: [userB.id],
+    });
+
+    const receivedData = await eventPromise;
+    expect(receivedData).toBeDefined();
+    expect(receivedData.type).toBe("GROUP");
+
+    clientSocket.disconnect();
   });
 
   it("GET /conversations -> should return all conversations for authenticated user", async () => {

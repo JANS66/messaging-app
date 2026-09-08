@@ -1,13 +1,9 @@
 import request from "supertest";
-import { createServer } from "http";
-import { Server } from "socket.io";
-import app from "../src/app.js";
 import { prisma } from "../src/config/db.js";
-import { clearDatabase } from "./helpers.js";
+import { clearDatabase, setupTestServer } from "./helpers.js";
 import { vi } from "vitest";
 import { io as ioClient } from "socket.io-client";
 import { setupPresenceHandlers } from "../src/sockets/presence.js";
-import { socketAuthMiddleware } from "../src/sockets/socket.auth.js";
 
 // Mock Cloudinary utility
 vi.mock("../src/utils/cloudinary.js", () => ({
@@ -26,19 +22,15 @@ const validPngBuffer = Buffer.from(
 describe("1. Auth and User Management", () => {
   let agent;
   let httpServer;
-  let io;
   let PORT;
 
   beforeAll(async () => {
     await clearDatabase();
 
-    httpServer = createServer(app);
-    io = new Server(httpServer, {
-      cors: { origin: "*", credentials: true },
+    const serverSetup = setupTestServer((io) => {
+      setupPresenceHandlers(io);
     });
-
-    io.use(socketAuthMiddleware);
-    setupPresenceHandlers(io);
+    httpServer = serverSetup.httpServer;
 
     await new Promise((resolve) => httpServer.listen(0, resolve));
     PORT = httpServer.address().port;

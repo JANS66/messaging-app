@@ -9,6 +9,11 @@ import conversationRoutes from "./routes/conversation.routes.js";
 
 const app = express();
 
+app.use((req, res, next) => {
+  req.io = req.app.get("io");
+  next();
+});
+
 // Security HTTP Headers
 app.use(helmet());
 

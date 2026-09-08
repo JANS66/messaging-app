@@ -18,7 +18,16 @@ const io = new Server(server, {
   },
 });
 
+app.set("io", io);
+
 io.use(socketAuthMiddleware);
+
+io.on("connection", (socket) => {
+  if (socket.userId) {
+    socket.join(socket.userId);
+  }
+});
+
 setupPresenceHandlers(io);
 
 server.listen(PORT, () => {

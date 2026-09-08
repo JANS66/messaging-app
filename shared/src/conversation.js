@@ -13,7 +13,9 @@ export const CreateConversationSchema = z
       groupAvatar: z.string().url().nullable().optional(),
       memberIds: z
         .array(z.string().uuid())
-        .min(1, "At least one member must be selected"),
+        .min(1, "At least one member must be selected")
+        // Clean up duplicate IDs
+        .transform((ids) => Array.from(new Set(ids))),
     }),
   })
   .refine(
