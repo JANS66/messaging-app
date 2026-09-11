@@ -223,3 +223,94 @@ export const createConversation = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getConversationById = async (req, res, next) => {
+  const { id } = req.params;
+  const currentUserId = req.user.id;
+
+  try {
+    const conversation = await prisma.conversation.findUnique({
+      where: { id },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+                status: true,
+                isOnline: true,
+                lastSeen: true,
+              },
+            },
+          },
+        },
+        lastMessage: {
+          select: {
+            id: true,
+            content: true,
+            type: true,
+            senderId: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Conversation not found",
+      });
+    }
+
+    const isDirect = conversation.type === "DIRECT";
+
+    // Extract the other participant if this is a 1 on 1 chat
+    const otherMember = isDirect
+      ? conversation.members.find((m) => m.userId !== currentUserId)?.user
+      : null;
+
+    const formattedConversation = {
+      id: conversation.id,
+      type: conversation.type,
+      name: isDirect ? otherMember?.username : conversation.name,
+      avatarUrl: isDirect ? otherMember?.avatarUrl : conversation.groupAvatar,
+      groupAvatar: conversation.groupAvatar,
+      updatedAt: conversation.updatedAt,
+      createdAt: conversation.createdAt,
+      recipient: otherMember
+        ? {
+            id: otherMember.id,
+            username: otherMember.username,
+            avatarUrl: otherMember.avatarUrl,
+            status: otherMember.status,
+            isOnline: otherMember.isOnline,
+            lastSeen: otherMember.lastSeen,
+          }
+        : null,
+      members: conversation.members.map((m) => ({
+        id: m.user.id,
+        username: m.user.username,
+        avatarUrl: m.user.avatarUrl,
+        status: m.user.status,
+        isOnline: m.user.isOnline,
+        lastSeen: m.user.lastSeen,
+        role: m.role,
+        joinedAt: m.joinedAt,
+        lastReadAt: m.lastReadAt,
+      })),
+      lastMessage: conversation.lastMessage,
+    };
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        conversation: formattedConversation,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};

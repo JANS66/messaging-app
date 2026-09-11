@@ -60,3 +60,7 @@ export const UpdateMemberRoleSchema = z.object({
     role: MemberRoleEnum,
   }),
 });
+
+export const GetConversationSchema = z.object({
+  params: UuidParamSchema,
+});

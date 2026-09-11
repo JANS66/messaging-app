@@ -116,6 +116,23 @@ describe("2. Conversations and Members", () => {
     expect(res.body.data.conversations.length).toBeGreaterThanOrEqual(2);
   });
 
+  it("GET /conversations/:id -> should successfully return conversation details for a member", async () => {
+    const res = await userA.agent.get(`/api/v1/conversations/${groupConvId}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.conversation).toBeDefined();
+    expect(res.body.data.conversation.id).toBe(groupConvId);
+    expect(res.body.data.conversation.name).toBe("Engineering Team");
+    expect(res.body.data.conversation.members).toBeDefined();
+    expect(res.body.data.conversation.members.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("GET /conversations/:id -> should fail with 403 if user is not a member", async () => {
+    const res = await userC.agent.get(`/api/v1/conversations/${groupConvId}`);
+
+    expect(res.status).toBe(403);
+  });
+
   it("POST /conversations/:id/members -> should deny non admin (User B) from adding members", async () => {
     const res = await userB.agent
       .post(`/api/v1/conversations/${groupConvId}/members`)
