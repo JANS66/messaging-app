@@ -34,3 +34,18 @@ export const handleAvatarUpload = async (req, res, next) => {
     next(error); // Sends directly to global error handler in app.js
   }
 };
+
+export const handleGroupAvatarUpload = async (req, res, next) => {
+  if (!req.file) return next();
+
+  try {
+    const { url } = await uploadToCloudinary(
+      req.file.buffer,
+      "messaging-app/group-avatars",
+    );
+    req.body.groupAvatar = url;
+    next();
+  } catch (error) {
+    next(error);
+  }
+};

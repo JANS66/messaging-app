@@ -1,4 +1,8 @@
 import { prisma } from "../config/db.js";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../utils/cloudinary.js";
 
 export const getConversations = async (req, res, next) => {
   const currentUserId = req.user.id;
@@ -311,6 +315,114 @@ export const getConversationById = async (req, res, next) => {
       },
     });
   } catch (error) {
+    next(error);
+  }
+};
+
+export const updateGroupDetails = async (req, res, next) => {
+  const { id } = req.params;
+  const { name } = req.body;
+  let newUploadedPublicId = null;
+
+  // Short circuit: Reject empty requests before touching DB or Cloudinary
+  if (name === undefined && !req.file) {
+    return res.status(400).json({
+      status: "fail",
+      message:
+        "Please provide at least one field to update (name or groupAvatar file)",
+    });
+  }
+
+  try {
+    // Fetch group conversation to verify type
+    const conversation = await prisma.conversation.findUnique({
+      where: { id },
+      include: {
+        members: {
+          select: { userId: true },
+        },
+      },
+    });
+
+    if (!conversation) {
+      return res.status(404).json({
+        status: "fail",
+        message: "Conversation not found",
+      });
+    }
+
+    if (conversation.type !== "GROUP") {
+      return res.status(400).json({
+        status: "fail",
+        message: "Only group conversations can have their details updated",
+      });
+    }
+
+    // Upload NEW file to Cloudinary if provided
+    let newGroupAvatarUrl;
+
+    if (req.file) {
+      const uploadResult = await uploadToCloudinary(
+        req.file.buffer,
+        "messaging-app/group-avatars",
+      );
+      newGroupAvatarUrl = uploadResult.url;
+      newUploadedPublicId = uploadResult.publicId; // Tracked for rollback cleanup
+    }
+
+    // Update Database (Atomic)
+    const updatedConversation = await prisma.conversation.update({
+      where: { id },
+      data: {
+        ...(name !== undefined && { name }),
+        ...(newGroupAvatarUrl && { groupAvatar: newGroupAvatarUrl }),
+      },
+      include: {
+        members: {
+          include: {
+            user: {
+              select: {
+                id: true,
+                username: true,
+                avatarUrl: true,
+                isOnline: true,
+                lastSeen: true,
+              },
+            },
+          },
+        },
+        lastMessage: true,
+      },
+    });
+
+    // Real time WebSocket event to all online group members
+    if (req.io) {
+      const payload = {
+        conversationId: updatedConversation.id,
+        name: updatedConversation.name,
+        groupAvatar: updatedConversation.groupAvatar,
+        updatedAt: updatedConversation.updatedAt,
+      };
+
+      updatedConversation.members.forEach((member) => {
+        req.io.to(member.userId).emit("conversation_updated", payload);
+      });
+    }
+
+    return res.status(200).json({
+      status: "success",
+      data: {
+        conversation: updatedConversation,
+      },
+    });
+  } catch (error) {
+    // ROLLBACK CLEANUP: Remove orphaned Cloudinary file if DB query fails
+    if (newUploadedPublicId) {
+      await deleteFromCloudinary(newUploadedPublicId).catch((cleanupErr) =>
+        console.error("Failed to cleanup orphaned group avatar:", cleanupErr),
+      );
+    }
+
     next(error);
   }
 };

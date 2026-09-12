@@ -34,7 +34,6 @@ export const UpdateConversationSchema = z.object({
   params: UuidParamSchema,
   body: z.object({
     name: z.string().min(1).max(100).optional(),
-    groupAvatar: z.string().url().nullable().optional(),
   }),
 });
 

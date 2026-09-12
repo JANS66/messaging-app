@@ -1,6 +1,25 @@
 import { prisma } from "../src/config/db.js";
+import {
+  deleteFromCloudinary,
+  uploadToCloudinary,
+} from "../src/utils/cloudinary.js";
 import { clearDatabase, createTestUsers, setupTestServer } from "./helpers.js";
 import { io as ioClient } from "socket.io-client";
+import { vi } from "vitest";
+
+// Mock Cloudinary utility
+vi.mock("../src/utils/cloudinary.js", () => ({
+  uploadToCloudinary: vi.fn().mockResolvedValue({
+    url: "https://res.cloudinary.com/demo/image/upload/group-sample.jpg",
+    publicId: "messaging-app/group-avatars/sample",
+  }),
+  deleteFromCloudinary: vi.fn().mockResolvedValue(true),
+}));
+
+const validPngBuffer = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9rawAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 describe("2. Conversations and Members", () => {
   let userA, userB, userC;
@@ -131,6 +150,59 @@ describe("2. Conversations and Members", () => {
     const res = await userC.agent.get(`/api/v1/conversations/${groupConvId}`);
 
     expect(res.status).toBe(403);
+  });
+
+  it("PATCH /conversations/:id -> should fail with 400 if no update fields or file are provided", async () => {
+    const res = await userA.agent
+      .patch(`/api/v1/conversations/${groupConvId}`)
+      .send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body.message).toContain("Please provide at least one field");
+  });
+
+  it("PATCH /conversations/:id -> should successfully update group name and broadcast via socket", async () => {
+    // Setup User B socket to listen for conversation_updated event
+    const loginRes = await userB.agent.post("/api/v1/auth/login").send({
+      email: "beta@example.com",
+      password: "Password123!",
+    });
+    const cookieHeader = loginRes.headers["set-cookie"].find((c) =>
+      c.startsWith("token="),
+    );
+
+    const clientSocket = ioClient(`http://localhost:${PORT}`, {
+      extraHeaders: { cookie: cookieHeader },
+    });
+
+    await new Promise((resolve, reject) => {
+      clientSocket.on("connect", resolve);
+      clientSocket.on("connect_error", reject);
+    });
+
+    const eventPromise = new Promise((resolve) => {
+      clientSocket.on("conversation_updated", (data) => {
+        resolve(data);
+      });
+    });
+
+    const res = await userA.agent
+      .patch(`/api/v1/conversations/${groupConvId}`)
+      .field("name", "Updated Engineering Team")
+      .attach("groupAvatar", validPngBuffer, "group-avatar.png");
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.conversation.name).toBe("Updated Engineering Team");
+    expect(res.body.data.conversation.groupAvatar).toBe(
+      "https://res.cloudinary.com/demo/image/upload/group-sample.jpg",
+    );
+
+    const socketData = await eventPromise;
+    expect(socketData).toBeDefined();
+    expect(socketData.conversationId).toBe(groupConvId);
+    expect(socketData.name).toBe("Updated Engineering Team");
+
+    clientSocket.disconnect();
   });
 
   it("POST /conversations/:id/members -> should deny non admin (User B) from adding members", async () => {
